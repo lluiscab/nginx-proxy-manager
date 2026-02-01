@@ -4,25 +4,26 @@ describe('Settings endpoints', () => {
 	let token;
 
 	before(() => {
+		cy.resetUsers();
 		cy.getToken().then((tok) => {
 			token = tok;
 		});
 	});
 
-	it('Get all settings', function() {
+	it('Get all settings', () => {
 		cy.task('backendApiGet', {
 			token: token,
-			path:  '/api/settings',
+			path: '/api/settings',
 		}).then((data) => {
 			cy.validateSwaggerSchema('get', 200, '/settings', data);
 			expect(data.length).to.be.greaterThan(0);
 		});
 	});
 
-	it('Get oidc-config setting', function() {
+	it('Get oidc-config setting', () => {
 		cy.task('backendApiGet', {
 			token: token,
-			path:  '/api/settings/oidc-config',
+			path: '/api/settings/oidc-config',
 		}).then((data) => {
 			cy.validateSwaggerSchema('get', 200, '/settings/{settingID}', data);
 			expect(data).to.have.property('id');
@@ -30,10 +31,10 @@ describe('Settings endpoints', () => {
 		});
 	});
 
-	it('OIDC settings can be updated', function() {
+	it('OIDC settings can be updated', () => {
 		cy.task('backendApiPut', {
 			token: token,
-			path:  '/api/settings/oidc-config',
+			path: '/api/settings/oidc-config',
 			data: {
 				meta: {
 					name: 'Some OIDC Provider',
@@ -42,7 +43,7 @@ describe('Settings endpoints', () => {
 					issuerURL: 'https://oidc.example.com',
 					redirectURL: 'https://redirect.example.com/api/oidc/callback',
 					enabled: true,
-				}
+				},
 			},
 		}).then((data) => {
 			cy.validateSwaggerSchema('put', 200, '/settings/{settingID}', data);
@@ -64,10 +65,10 @@ describe('Settings endpoints', () => {
 		});
 	});
 
-	it('Get default-site setting', function() {
+	it('Get default-site setting', () => {
 		cy.task('backendApiGet', {
 			token: token,
-			path:  '/api/settings/default-site',
+			path: '/api/settings/default-site',
 		}).then((data) => {
 			cy.validateSwaggerSchema('get', 200, '/settings/{settingID}', data);
 			expect(data).to.have.property('id');
@@ -75,10 +76,10 @@ describe('Settings endpoints', () => {
 		});
 	});
 
-	it('Default Site congratulations', function() {
+	it('Default Site congratulations', () => {
 		cy.task('backendApiPut', {
 			token: token,
-			path:  '/api/settings/default-site',
+			path: '/api/settings/default-site',
 			data: {
 				value: 'congratulations',
 			},
@@ -91,10 +92,10 @@ describe('Settings endpoints', () => {
 		});
 	});
 
-	it('Default Site 404', function() {
+	it('Default Site 404', () => {
 		cy.task('backendApiPut', {
 			token: token,
-			path:  '/api/settings/default-site',
+			path: '/api/settings/default-site',
 			data: {
 				value: '404',
 			},
@@ -107,10 +108,10 @@ describe('Settings endpoints', () => {
 		});
 	});
 
-	it('Default Site 444', function() {
+	it('Default Site 444', () => {
 		cy.task('backendApiPut', {
 			token: token,
-			path:  '/api/settings/default-site',
+			path: '/api/settings/default-site',
 			data: {
 				value: '444',
 			},
@@ -123,10 +124,10 @@ describe('Settings endpoints', () => {
 		});
 	});
 
-	it('Default Site redirect', function() {
+	it('Default Site redirect', () => {
 		cy.task('backendApiPut', {
 			token: token,
-			path:  '/api/settings/default-site',
+			path: '/api/settings/default-site',
 			data: {
 				value: 'redirect',
 				meta: {
@@ -145,14 +146,14 @@ describe('Settings endpoints', () => {
 		});
 	});
 
-	it('Default Site html', function() {
+	it('Default Site html', () => {
 		cy.task('backendApiPut', {
 			token: token,
-			path:  '/api/settings/default-site',
+			path: '/api/settings/default-site',
 			data: {
 				value: 'html',
 				meta: {
-					html: '<p>hello world</p>'
+					html: '<p>hello world</p>',
 				},
 			},
 		}).then((data) => {

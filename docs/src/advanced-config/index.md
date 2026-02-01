@@ -51,7 +51,6 @@ Let's look at a Portainer example:
 
 ```yml
 services:
-
   portainer:
     image: portainer/portainer
     privileged: true
@@ -79,7 +78,7 @@ feature by adding the following to the service in your `docker-compose.yml` file
 
 ```yml
 healthcheck:
-  test: ["CMD", "/usr/bin/check-health"]
+  test: ['CMD', '/usr/bin/check-health']
   interval: 10s
   timeout: 3s
 ```
@@ -112,12 +111,12 @@ services:
       - '81:81'
     environment:
       # These are the settings to access your db
-      DB_MYSQL_HOST: "db"
+      DB_MYSQL_HOST: 'db'
       DB_MYSQL_PORT: 3306
-      DB_MYSQL_USER: "npm"
+      DB_MYSQL_USER: 'npm'
       # DB_MYSQL_PASSWORD: "npm"  # use secret instead
       DB_MYSQL_PASSWORD__FILE: /run/secrets/MYSQL_PWD
-      DB_MYSQL_NAME: "npm"
+      DB_MYSQL_NAME: 'npm'
       # If you would rather use Sqlite, remove all DB_MYSQL_* lines above
       # Uncomment this if IPv6 is not enabled on your host
       # DISABLE_IPV6: 'true'
@@ -135,8 +134,8 @@ services:
     environment:
       # MYSQL_ROOT_PASSWORD: "npm"  # use secret instead
       MYSQL_ROOT_PASSWORD__FILE: /run/secrets/DB_ROOT_PWD
-      MYSQL_DATABASE: "npm"
-      MYSQL_USER: "npm"
+      MYSQL_DATABASE: 'npm'
+      MYSQL_USER: 'npm'
       # MYSQL_PASSWORD: "npm"  # use secret instead
       MYSQL_PASSWORD__FILE: /run/secrets/MYSQL_PWD
       MARIADB_AUTO_UPGRADE: '1'
@@ -147,7 +146,6 @@ services:
       - MYSQL_PWD
 ```
 
-
 ## Disabling IPv6
 
 On some Docker hosts IPv6 may not be enabled. In these cases, the following message may be seen in the log:
@@ -157,10 +155,18 @@ On some Docker hosts IPv6 may not be enabled. In these cases, the following mess
 The easy fix is to add a Docker environment variable to the Nginx Proxy Manager stack:
 
 ```yml
-    environment:
-      DISABLE_IPV6: 'true'
+environment:
+  DISABLE_IPV6: 'true'
 ```
 
+## Disabling IP Ranges Fetch
+
+By default, NPM fetches IP ranges from CloudFront and Cloudflare during application startup. In environments with limited internet access or to speed up container startup, this fetch can be disabled:
+
+```yml
+environment:
+  IP_RANGES_FETCH_ENABLED: 'false'
+```
 
 ## Custom Nginx Configurations
 
@@ -170,20 +176,20 @@ NPM has the ability to include different custom configuration snippets in differ
 
 You can add your custom configuration snippet files at `/data/nginx/custom` as follow:
 
- - `/data/nginx/custom/root_top.conf`: Included at the top of nginx.conf
- - `/data/nginx/custom/root.conf`: Included at the very end of nginx.conf
- - `/data/nginx/custom/http_top.conf`: Included at the top of the main http block
- - `/data/nginx/custom/http.conf`: Included at the end of the main http block
- - `/data/nginx/custom/events.conf`: Included at the end of the events block
- - `/data/nginx/custom/stream.conf`: Included at the end of the main stream block
- - `/data/nginx/custom/server_proxy.conf`: Included at the end of every proxy server block
- - `/data/nginx/custom/server_redirect.conf`: Included at the end of every redirection server block
- - `/data/nginx/custom/server_stream.conf`: Included at the end of every stream server block
- - `/data/nginx/custom/server_stream_tcp.conf`: Included at the end of every TCP stream server block
- - `/data/nginx/custom/server_stream_udp.conf`: Included at the end of every UDP stream server block
+- `/data/nginx/custom/root_top.conf`: Included at the top of nginx.conf
+- `/data/nginx/custom/root.conf`: Included at the very end of nginx.conf
+- `/data/nginx/custom/http_top.conf`: Included at the top of the main http block
+- `/data/nginx/custom/http.conf`: Included at the end of the main http block
+- `/data/nginx/custom/events.conf`: Included at the end of the events block
+- `/data/nginx/custom/stream.conf`: Included at the end of the main stream block
+- `/data/nginx/custom/server_proxy.conf`: Included at the end of every proxy server block
+- `/data/nginx/custom/server_redirect.conf`: Included at the end of every redirection server block
+- `/data/nginx/custom/server_stream.conf`: Included at the end of every stream server block
+- `/data/nginx/custom/server_stream_tcp.conf`: Included at the end of every TCP stream server block
+- `/data/nginx/custom/server_stream_udp.conf`: Included at the end of every UDP stream server block
+- `/data/nginx/custom/server_dead.conf`: Included at the end of every 404 server block
 
 Every file is optional.
-
 
 ## X-FRAME-OPTIONS Header
 
@@ -204,9 +210,8 @@ Depending on the usage, this can lead to large log files, especially access logs
 You can customise the logrotate configuration through a mount (if your custom config is `logrotate.custom`):
 
 ```yml
-  volumes:
-    ...
-    - ./logrotate.custom:/etc/logrotate.d/nginx-proxy-manager
+volumes: ...
+  - ./logrotate.custom:/etc/logrotate.d/nginx-proxy-manager
 ```
 
 For reference, the default configuration can be found [here](https://github.com/NginxProxyManager/nginx-proxy-manager/blob/develop/docker/rootfs/etc/logrotate.d/nginx-proxy-manager).
@@ -219,3 +224,56 @@ To enable the geoip2 module, you can create the custom configuration file `/data
 load_module /usr/lib/nginx/modules/ngx_http_geoip2_module.so;
 load_module /usr/lib/nginx/modules/ngx_stream_geoip2_module.so;
 ```
+
+## Auto Initial User Creation
+
+Setting these environment variables will create the default user on startup, skipping the UI first user setup screen:
+
+```
+    environment:
+      INITIAL_ADMIN_EMAIL: my@example.com
+      INITIAL_ADMIN_PASSWORD: mypassword1
+```
+
+## OpenID Connect - Single Sign-On (SSO)
+
+Nginx Proxy Manager supports single sign-on (SSO) with OpenID Connect. This feature allows you to use an external OpenID Connect provider log in.
+
+::: warning
+
+Please note, that this feature requires a user to have an existing account to have been created via the "Users" page in the admin interface.
+
+:::
+
+### Provider Configuration
+
+However, before you configure this feature, you need to have an OpenID Connect provider.
+If you don't have one, you can use Authentik, which is an open-source OpenID Connect provider. Auth0 is another popular OpenID Connect provider that offers a free tier.
+
+Each provider is a little different, so you will need to refer to the provider's documentation to get the necessary information to configure a new application.
+You will need the `Client ID`, `Client Secret`, and `Issuer URL` from the provider. When you create the application in the provider, you will also need to include the `Redirect URL` in the list of allowed redirect URLs for the application.
+Nginx Proxy Manager uses the `/api/oidc/callback` endpoint for the redirect URL.
+The scopes requested by Nginx Proxy Manager are `openid`, `email`, and `profile` - make sure your auth provider supports these scopes.
+
+We have confirmed that the following providers work with Nginx Proxy Manager. If you have success with another provider, make a pull request to add it to the list!
+
+- Authentik
+- Authelia
+- Auth0
+
+### Nginx Proxy Manager Configuration
+
+To enable SSO, log into the management interface as an Administrator and navigate to the "Settings" page.
+The setting to configure OpenID Connect is named "OpenID Connect Configuration".
+Click the 3 dots on the far right side of the table and then click "Edit".
+In the modal that appears, you will see a form with the following fields:
+
+| Field         | Description                                               | Example Value                               | Notes                                                               |
+| ------------- | --------------------------------------------------------- | ------------------------------------------- | ------------------------------------------------------------------- |
+| Name          | The name of the OpenID Connect provider                   | Authentik                                   | This will be shown on the login page (eg: "Sign in with Authentik") |
+| Client ID     | The client ID provided by the OpenID Connect provider     | `xyz...456`                                 |                                                                     |
+| Client Secret | The client secret provided by the OpenID Connect provider | `abc...123`                                 |
+| Issuer URL    | The issuer URL provided by the OpenID Connect provider    | `https://authentik.example.com`             | This is the URL that the provider uses to identify itself           |
+| Redirect URL  | The redirect URL to use for the OpenID Connect provider   | `https://npm.example.com/api/oidc/callback` |                                                                     |
+
+After filling in the fields, click "Save" to save the settings. You can now use the "Sign in with Authentik" button on the login page to sign in with your OpenID Connect provider.

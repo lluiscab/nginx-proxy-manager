@@ -1,72 +1,70 @@
-const config              = require('./lib/config');
-const logger              = require('./logger').setup;
-const certificateModel    = require('./models/certificate');
-const userModel           = require('./models/user');
-const userPermissionModel = require('./models/user_permission');
-const utils               = require('./lib/utils');
-const authModel           = require('./models/auth');
-const settingModel        = require('./models/setting');
-const certbot             = require('./lib/certbot');
+import { installPlugins } from "./lib/certbot.js";
+import utils from "./lib/utils.js";
+import { setup as logger } from "./logger.js";
+import authModel from "./models/auth.js";
+import certificateModel from "./models/certificate.js";
+import settingModel from "./models/setting.js";
+import userModel from "./models/user.js";
+import userPermissionModel from "./models/user_permission.js";
+
+export const isSetup = async () => {
+	const row = await userModel.query().select("id").where("is_deleted", 0).first();
+	return row?.id > 0;
+};
+
 /**
  * Creates a default admin users if one doesn't already exist in the database
  *
  * @returns {Promise}
  */
-const setupDefaultUser = () => {
-	return userModel
-		.query()
-		.select(userModel.raw('COUNT(`id`) as `count`'))
-		.where('is_deleted', 0)
-		.first()
-		.then((row) => {
-			if (!row.count) {
-				// Create a new user and set password
-				let email    = process.env.INITIAL_ADMIN_EMAIL || 'admin@example.com';
-				let password = process.env.INITIAL_ADMIN_PASSWORD || 'changeme';
-				
-				logger.info('Creating a new user: ' + email + ' with password: ' + password);
+const setupDefaultUser = async () => {
+	const initialAdminEmail = process.env.INITIAL_ADMIN_EMAIL;
+	const initialAdminPassword = process.env.INITIAL_ADMIN_PASSWORD;
 
-				let data = {
-					is_deleted: 0,
-					email:      email,
-					name:       'Administrator',
-					nickname:   'Admin',
-					avatar:     '',
-					roles:      ['admin'],
-				};
+	// This will only create a new user when there are no active users in the database
+	// and the INITIAL_ADMIN_EMAIL and INITIAL_ADMIN_PASSWORD environment variables are set.
+	// Otherwise, users should be shown the setup wizard in the frontend.
+	// I'm keeping this legacy behavior in case some people are automating deployments.
 
-				return userModel
-					.query()
-					.insertAndFetch(data)
-					.then((user) => {
-						return authModel
-							.query()
-							.insert({
-								user_id: user.id,
-								type:    'password',
-								secret:  password,
-								meta:    {},
-							})
-							.then(() => {
-								return userPermissionModel.query().insert({
-									user_id:           user.id,
-									visibility:        'all',
-									proxy_hosts:       'manage',
-									redirection_hosts: 'manage',
-									dead_hosts:        'manage',
-									streams:           'manage',
-									access_lists:      'manage',
-									certificates:      'manage',
-								});
-							});
-					})
-					.then(() => {
-						logger.info('Initial admin setup completed');
-					});
-			} else if (config.debug()) {
-				logger.info('Admin user setup not required');
-			}
+	if (!initialAdminEmail || !initialAdminPassword) {
+		return Promise.resolve();
+	}
+
+	const userIsetup = await isSetup();
+	if (!userIsetup) {
+		// Create a new user and set password
+		logger.info(`Creating a new user: ${initialAdminEmail} with password: ${initialAdminPassword}`);
+
+		const data = {
+			is_deleted: 0,
+			email: initialAdminEmail,
+			name: "Administrator",
+			nickname: "Admin",
+			avatar: "",
+			roles: ["admin"],
+		};
+
+		const user = await userModel.query().insertAndFetch(data);
+
+		await authModel.query().insert({
+			user_id: user.id,
+			type: "password",
+			secret: initialAdminPassword,
+			meta: {},
 		});
+
+		await userPermissionModel.query().insert({
+			user_id: user.id,
+			visibility: "all",
+			proxy_hosts: "manage",
+			redirection_hosts: "manage",
+			dead_hosts: "manage",
+			streams: "manage",
+			access_lists: "manage",
+			certificates: "manage",
+		});
+		logger.info("Initial admin setup completed");
+	}
 };
 
 /**
@@ -78,52 +76,52 @@ const setupDefaultSettings = () => {
 	return Promise.all([
 		settingModel
 			.query()
-			.select(settingModel.raw('COUNT(`id`) as `count`'))
-			.where({id: 'default-site'})
+			.select("id")
+			.where({ id: "default-site" })
 			.first()
 			.then((row) => {
 				if (!row.count) {
 					settingModel
 						.query()
 						.insert({
-							id:          'default-site',
-							name:        'Default Site',
-							description: 'What to show when Nginx is hit with an unknown Host',
-							value:       'congratulations',
-							meta:        {},
+							id: "default-site",
+							name: "Default Site",
+							description: "What to show when Nginx is hit with an unknown Host",
+							value: "congratulations",
+							meta: {},
 						})
 						.then(() => {
-							logger.info('Added default-site setting');
+							logger.info("Added default-site setting");
 						});
 				}
 				if (config.debug()) {
-					logger.info('Default setting setup not required');
+					logger.info("Default setting setup not required");
 				}
 			}),
 		settingModel
 			.query()
-			.select(settingModel.raw('COUNT(`id`) as `count`'))
-			.where({id: 'oidc-config'})
+			.select("id")
+			.where({ id: "oidc-config" })
 			.first()
 			.then((row) => {
 				if (!row.count) {
 					settingModel
 						.query()
 						.insert({
-							id:          'oidc-config',
-							name:        'Open ID Connect',
-							description: 'Sign in to Nginx Proxy Manager with an external Identity Provider',
-							value:       'metadata',
-							meta:        {},
+							id: "oidc-config",
+							name: "Open ID Connect",
+							description: "Sign in to Nginx Proxy Manager with an external Identity Provider",
+							value: "metadata",
+							meta: {},
 						})
 						.then(() => {
-							logger.info('Added oidc-config setting');
+							logger.info("Added oidc-config setting");
 						});
 				}
 				if (config.debug()) {
-					logger.info('Default setting setup not required');
+					logger.info("Default setting setup not required");
 				}
-			})
+			}),
 	]);
 };
 
@@ -132,44 +130,41 @@ const setupDefaultSettings = () => {
  *
  * @returns {Promise}
  */
-const setupCertbotPlugins = () => {
-	return certificateModel
-		.query()
-		.where('is_deleted', 0)
-		.andWhere('provider', 'letsencrypt')
-		.then((certificates) => {
-			if (certificates && certificates.length) {
-				let plugins  = [];
-				let promises = [];
+const setupCertbotPlugins = async () => {
+	const certificates = await certificateModel.query().where("is_deleted", 0).andWhere("provider", "letsencrypt");
 
-				certificates.map(function (certificate) {
-					if (certificate.meta && certificate.meta.dns_challenge === true) {
-						if (plugins.indexOf(certificate.meta.dns_provider) === -1) {
-							plugins.push(certificate.meta.dns_provider);
-						}
+	if (certificates?.length) {
+		const plugins = [];
+		const promises = [];
 
-						// Make sure credentials file exists
-						const credentials_loc = '/etc/letsencrypt/credentials/credentials-' + certificate.id;
-						// Escape single quotes and backslashes
-						const escapedCredentials = certificate.meta.dns_provider_credentials.replaceAll('\'', '\\\'').replaceAll('\\', '\\\\');
-						const credentials_cmd    = '[ -f \'' + credentials_loc + '\' ] || { mkdir -p /etc/letsencrypt/credentials 2> /dev/null; echo \'' + escapedCredentials + '\' > \'' + credentials_loc + '\' && chmod 600 \'' + credentials_loc + '\'; }';
-						promises.push(utils.exec(credentials_cmd));
-					}
-				});
+		certificates.map((certificate) => {
+			if (certificate.meta && certificate.meta.dns_challenge === true) {
+				if (plugins.indexOf(certificate.meta.dns_provider) === -1) {
+					plugins.push(certificate.meta.dns_provider);
+				}
 
-				return certbot.installPlugins(plugins)
-					.then(() => {
-						if (promises.length) {
-							return Promise.all(promises)
-								.then(() => {
-									logger.info('Added Certbot plugins ' + plugins.join(', '));
-								});
-						}
-					});
+				// Make sure credentials file exists
+				const credentials_loc = `/etc/letsencrypt/credentials/credentials-${certificate.id}`;
+				// Escape single quotes and backslashes
+				if (typeof certificate.meta.dns_provider_credentials === "string") {
+					const escapedCredentials = certificate.meta.dns_provider_credentials
+						.replaceAll("'", "\\'")
+						.replaceAll("\\", "\\\\");
+					const credentials_cmd = `[ -f '${credentials_loc}' ] || { mkdir -p /etc/letsencrypt/credentials 2> /dev/null; echo '${escapedCredentials}' > '${credentials_loc}' && chmod 600 '${credentials_loc}'; }`;
+					promises.push(utils.exec(credentials_cmd));
+				}
 			}
+			return true;
 		});
-};
 
+		await installPlugins(plugins);
+
+		if (promises.length) {
+			await Promise.all(promises);
+			logger.info(`Added Certbot plugins ${plugins.join(", ")}`);
+		}
+	}
+};
 
 /**
  * Starts a timer to call run the logrotation binary every two days
@@ -180,20 +175,17 @@ const setupLogrotation = () => {
 
 	const runLogrotate = async () => {
 		try {
-			await utils.exec('logrotate /etc/logrotate.d/nginx-proxy-manager');
-			logger.info('Logrotate completed.');
-		} catch (e) { logger.warn(e); }
+			await utils.exec("logrotate /etc/logrotate.d/nginx-proxy-manager");
+			logger.info("Logrotate completed.");
+		} catch (e) {
+			logger.warn(e);
+		}
 	};
 
-	logger.info('Logrotate Timer initialized');
+	logger.info("Logrotate Timer initialized");
 	setInterval(runLogrotate, intervalTimeout);
 	// And do this now as well
 	return runLogrotate();
 };
 
-module.exports = function () {
-	return setupDefaultUser()
-		.then(setupDefaultSettings)
-		.then(setupCertbotPlugins)
-		.then(setupLogrotation);
-};
+export default () => setupDefaultUser().then(setupDefaultSettings).then(setupCertbotPlugins).then(setupLogrotation);

@@ -13,6 +13,7 @@ services:
   app:
     image: 'jc21/nginx-proxy-manager:latest'
     restart: unless-stopped
+
     ports:
       # These ports are in format <host-port>:<container-port>
       - '80:80' # Public HTTP Port
@@ -21,8 +22,9 @@ services:
       # Add any other Stream port you want to expose
       # - '21:21' # FTP
 
-    # Uncomment the next line if you uncomment anything in the section
-    # environment:
+    environment:
+      TZ: "Australia/Brisbane"
+
       # Uncomment this if you want to change the location of
       # the SQLite DB file within the container
       # DB_SQLITE_FILE: "/data/database.sqlite"
@@ -66,12 +68,17 @@ services:
       # Add any other Stream port you want to expose
       # - '21:21' # FTP
     environment:
+      TZ: "Australia/Brisbane"
       # Mysql/Maria connection parameters:
       DB_MYSQL_HOST: "db"
       DB_MYSQL_PORT: 3306
       DB_MYSQL_USER: "npm"
       DB_MYSQL_PASSWORD: "npm"
       DB_MYSQL_NAME: "npm"
+      # Optional SSL (see section below)
+      # DB_MYSQL_SSL: 'true'
+      # DB_MYSQL_SSL_REJECT_UNAUTHORIZED: 'true'
+      # DB_MYSQL_SSL_VERIFY_IDENTITY: 'true'
       # Uncomment this if IPv6 is not enabled on your host
       # DISABLE_IPV6: 'true'
     volumes:
@@ -96,6 +103,64 @@ services:
 ::: warning
 
 Please note, that `DB_MYSQL_*` environment variables will take precedent over `DB_SQLITE_*` variables. So if you keep the MySQL variables, you will not be able to use SQLite.
+
+:::
+
+### Optional: MySQL / MariaDB SSL
+
+You can enable TLS for the MySQL/MariaDB connection with these environment variables:
+
+- DB_MYSQL_SSL: Enable SSL when set to true. If unset or false, SSL disabled (previous default behaviour).
+- DB_MYSQL_SSL_REJECT_UNAUTHORIZED: (default: true) Validate the server certificate chain. Set to false to allow self‑signed/unknown CA.
+- DB_MYSQL_SSL_VERIFY_IDENTITY: (default: true) Performs host name / identity verification.
+
+Enabling SSL using a self-signed cert (not recommended for production).
+
+## Using Postgres database
+
+Similar to the MySQL server setup:
+
+```yml
+services:
+  app:
+    image: 'jc21/nginx-proxy-manager:latest'
+    restart: unless-stopped
+    ports:
+      # These ports are in format <host-port>:<container-port>
+      - '80:80' # Public HTTP Port
+      - '443:443' # Public HTTPS Port
+      - '81:81' # Admin Web Port
+      # Add any other Stream port you want to expose
+      # - '21:21' # FTP
+    environment:
+      TZ: "Australia/Brisbane"
+      # Postgres parameters:
+      DB_POSTGRES_HOST: 'db'
+      DB_POSTGRES_PORT: '5432'
+      DB_POSTGRES_USER: 'npm'
+      DB_POSTGRES_PASSWORD: 'npmpass'
+      DB_POSTGRES_NAME: 'npm'
+      # Uncomment this if IPv6 is not enabled on your host
+      # DISABLE_IPV6: 'true'
+    volumes:
+      - ./data:/data
+      - ./letsencrypt:/etc/letsencrypt
+    depends_on:
+      - db
+
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: 'npm'
+      POSTGRES_PASSWORD: 'npmpass'
+      POSTGRES_DB: 'npm'
+    volumes:
+      - ./postgresql:/var/lib/postgresql
+```
+
+::: warning
+
+Custom Postgres schema is not supported, as such `public` will be used.
 
 :::
 
@@ -127,60 +192,3 @@ After the app is running for the first time, the following will happen:
 3. A default admin user will be created
 
 This process can take a couple of minutes depending on your machine.
-
-## Default Administrator User
-
-```
-Email:    admin@example.com
-Password: changeme
-```
-
-Immediately after logging in with this default user you will be asked to modify your details and change your password. You can change defaults with:
-
-
-```
-    environment:
-      INITIAL_ADMIN_EMAIL: my@example.com
-      INITIAL_ADMIN_PASSWORD: mypassword1
-```
-
-## OpenID Connect - Single Sign-On (SSO)
-
-Nginx Proxy Manager supports single sign-on (SSO) with OpenID Connect. This feature allows you to use an external OpenID Connect provider log in.
-
-::: warning
-
-Please note, that this feature requires a user to have an existing account to have been created via the "Users" page in the admin interface.
-
-:::
-
-### Provider Configuration
-However, before you configure this feature, you need to have an OpenID Connect provider.
-If you don't have one, you can use Authentik, which is an open-source OpenID Connect provider. Auth0 is another popular OpenID Connect provider that offers a free tier.
-
-Each provider is a little different, so you will need to refer to the provider's documentation to get the necessary information to configure a new application.
-You will need the `Client ID`, `Client Secret`, and `Issuer URL` from the provider. When you create the application in the provider, you will also need to include the `Redirect URL` in the list of allowed redirect URLs for the application.
-Nginx Proxy Manager uses the `/api/oidc/callback` endpoint for the redirect URL.
-The scopes requested by Nginx Proxy Manager are `openid`, `email`, and `profile` - make sure your auth provider supports these scopes.
-
-We have confirmed that the following providers work with Nginx Proxy Manager. If you have success with another provider, make a pull request to add it to the list!
-- Authentik
-- Authelia
-- Auth0
-
-### Nginx Proxy Manager Configuration
-To enable SSO, log into the management interface as an Administrator and navigate to the "Settings" page.
-The setting to configure OpenID Connect is named "OpenID Connect Configuration".
-Click the 3 dots on the far right side of the table and then click "Edit".
-In the modal that appears, you will see a form with the following fields:
-
-| Field         | Description                                               | Example Value                               | Notes                                                               |
-|---------------|-----------------------------------------------------------|---------------------------------------------|---------------------------------------------------------------------|
-| Name          | The name of the OpenID Connect provider                   | Authentik                                   | This will be shown on the login page (eg: "Sign in with Authentik") |
-| Client ID     | The client ID provided by the OpenID Connect provider     | `xyz...456`                                 |                                                                     |
-| Client Secret | The client secret provided by the OpenID Connect provider | `abc...123`                                 |
-| Issuer URL    | The issuer URL provided by the OpenID Connect provider    | `https://authentik.example.com`             | This is the URL that the provider uses to identify itself           |
-| Redirect URL  | The redirect URL to use for the OpenID Connect provider   | `https://npm.example.com/api/oidc/callback` |                                                                     |
-
-After filling in the fields, click "Save" to save the settings. You can now use the "Sign in with Authentik" button on the login page to sign in with your OpenID Connect provider.
-
